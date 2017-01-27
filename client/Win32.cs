@@ -28,13 +28,6 @@ namespace Client
             uint nTimeOut);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool SetNamedPipeHandleState(
-            SafeFileHandle hNamedPipe,
-            uint lpMode,
-            IntPtr lpMaxCollectionCount,
-            IntPtr lpCollectDataTimeout);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool WriteFile(
             SafeFileHandle hFile,

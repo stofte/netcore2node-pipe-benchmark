@@ -54,7 +54,7 @@
             var duration = DateTime.Now.Subtract(start).TotalSeconds;
 
             Console.WriteLine("Total {0} mbytes, duration {1} secs", bytesWritten / 1024 / 1024, duration);
-
+            Win32.CloseHandle(pipe);
         }
 
         static uint Write(SafeFileHandle pipe, byte[] bytes, uint byteToWrite)
