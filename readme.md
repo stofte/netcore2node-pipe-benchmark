@@ -1,7 +1,7 @@
-.NET Core to NodeJS Pipe Bench
-----------------------------
+.NET Core to NodeJS pipe benchmark
+----------------------------------
 
-This repo contains some basic code that benchmarks pipe throughput from
+This repo contains code that benchmarks pipe throughput from
 .NET Core to NodeJS. Win32 and JSON only for now.
 
 Start the server:
