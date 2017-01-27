@@ -5,8 +5,10 @@ const decoder = new StringDecoder('utf8');
 const jsonServer = namedPipes.listen('d2n-json-pipe');
 
 const result = {
-    json: { received: 0, letters: 0, duration: 0, rate: [] }
+    json: { received: 0, letters: 0, duration: 0, rate: [], data: [] }
 }
+
+jsonServer.on('message', buffer => handleMsg('json', buffer));
 
 function handleMsg(type, buffer) {
     if (type === 'json') {
@@ -17,13 +19,13 @@ function handleMsg(type, buffer) {
         data.forEach(elm => {
             result.json.letters += elm.LoremIpsum.length;
         })
+        result.json.data = result.json.data.concat(data);
         result.json.received += buffer.length;
         result.json.duration += diff;
         result.json.rate.push({ time: end, size: buffer.length });
     }
 }
 
-jsonServer.on('message', buffer => handleMsg('json', buffer));
 
 const windowSec = 10;
 setInterval(() => {
@@ -38,7 +40,7 @@ setInterval(() => {
     let log = '---';
     if (bytes !== 0) {
         let mbs = (bytes/1024/1024/windowSec).toFixed(3);
-        log = `${mbs} mbytes/sec, duration ${result.json.duration} ms, letters ${result.json.letters}`;
+        log = `${mbs} mbytes/sec, duration ${result.json.duration} ms, count ${result.json.data.length}`;
     }
     console.log(`[${new Date().toLocaleTimeString()}] json: ${log}`);
 }, windowSec * 1000);
