@@ -2,9 +2,9 @@ const EventEmitter = require('events').EventEmitter;
 const net = require('net');
 
 class PipeServerEmitter extends EventEmitter {
-    constructor(pipeName) {
+    constructor(pipeName, win32 = true) {
         super();
-        this.pipeAddress = '\\\\.\\pipe\\' + pipeName;
+        this.pipeAddress = win32 ? `\\\\.\\pipe\\${pipeName}` : `/tmp/${pipeName}.pipe`;
         this.createStream = (stream) => {
             return stream.on('data', this.handleWrite);
         }
