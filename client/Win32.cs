@@ -9,7 +9,7 @@ namespace Client
     {
         public static bool IsWin32()
         {
-            return RuntimeInformation.OSDescription.StartsWith("Windows");
+            return RuntimeInformation.OSDescription.StartsWith("Microsoft Windows");
         }
 
         public const uint PIPE_WAIT	= 0x00000000;
