@@ -7,6 +7,11 @@ namespace Client
 
     public static class Win32 
     {
+        public static bool IsWin32()
+        {
+            return RuntimeInformation.OSDescription.StartsWith("Windows");
+        }
+
         public const uint PIPE_WAIT	= 0x00000000;
         public const uint PIPE_READMODE_MESSAGE = 0x00000002;
         public const Int64 INVALID_HANDLE_VALUE = -1;

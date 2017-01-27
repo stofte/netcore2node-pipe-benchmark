@@ -14,12 +14,26 @@
     {
         public static void Main(string[] args)
         {
-            var itemCount = int.Parse(args[0]);
-            var tasks = new [] { new Task(() => Json(itemCount)) };
-            foreach(var t in tasks) {
-                t.Start();
+            if (Linux.IsLinux())
+            {
+                IntPtr[] fds = new IntPtr[2];
+                var pipe = Linux.pipe(fds);
+                Console.WriteLine("Linux pipe => {0}", pipe);
+                Linux.close(fds[0]);
+                Console.WriteLine("fds => [{0}, {1}]", fds[0], fds[1]);
+                var str = "hej mor";
+                var bytes = Encoding.UTF8.GetBytes(str);
+                Linux.write(fds[0], bytes, (uint)bytes.Length);
             }
-            Task.WaitAll(tasks);
+            else if (Win32.IsWin32())
+            {
+                var itemCount = int.Parse(args[0]);
+                var tasks = new [] { new Task(() => Json(itemCount)) };
+                foreach(var t in tasks) {
+                    t.Start();
+                }
+                Task.WaitAll(tasks);
+            }
         }
 
         public static void Json(int itemCount)
