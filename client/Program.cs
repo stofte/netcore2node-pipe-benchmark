@@ -4,16 +4,41 @@
     using System.ComponentModel;
     using System.IO;
     using System.Linq;
+    using System.Net;
+    using System.Net.Sockets;
     using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading.Tasks;
     using Microsoft.Win32.SafeHandles;
     using Newtonsoft.Json;
 
+    public enum TestIpc
+    {
+        NamedPipe,
+        TcpSocket
+    }
+
+    public static class GuidHelper
+    {
+        public static string ToIdentifierWithPrefix(this Guid guid, string prefix)
+        {
+            return string.Format("{0}{1}", prefix, guid.ToString().Replace("-", ""));
+        }
+    }
+
     public class Program
     {
         public static void Main(string[] args)
         {
+            var itemCount = int.Parse(args[0]);
+            TestIpc test = TestIpc.NamedPipe;
+            int portNumber = 0;
+            if (args[1] == "tcp")
+            {
+                test = TestIpc.TcpSocket;
+                portNumber = int.Parse(args[2]);
+            }
+
             if (Linux.IsLinux())
             {
                 IntPtr[] fds = new IntPtr[2];
@@ -27,8 +52,7 @@
             }
             else if (Win32.IsWin32())
             {
-                var itemCount = int.Parse(args[0]);
-                var tasks = new [] { new Task(() => Json(itemCount)) };
+                var tasks = new [] { new Task(() => Json(itemCount, test, portNumber)) };
                 foreach(var t in tasks) {
                     t.Start();
                 }
@@ -36,16 +60,27 @@
             }
         }
 
-        public static void Json(int itemCount)
+        public static void Json(int itemCount, TestIpc ipcType, int portNumber)
         {
+            SafeFileHandle pipe = null;
+            Socket socket = null;
+
             var start = DateTime.Now;
-            var pipe = GetPipeClient("d2n-json-pipe");
+            if (ipcType == TestIpc.NamedPipe)
+            {
+                pipe = GetPipeClient("d2n-json-pipe");
+            }
+            else if (ipcType == TestIpc.TcpSocket)
+            {
+                socket = GetSocket(portNumber);
+            }
             var itemsSent = 0;
 
             var serializer = new JsonSerializer();
             var data = TestData.Generate(itemCount);
             uint bytesWritten = 0;
-            byte[] buffer = new byte[100 * 1000 * 1000];
+            byte[] buffer = new byte[100 * 1024 * 1024];
+            byte[] headBuffer = new byte[4];
             
             while (true)
             {
@@ -60,28 +95,60 @@
                 serializer.Serialize(jsonWriter, chunk);
                 jsonWriter.Flush();
                 var bufferSize = (uint) stream.Position;
-                var chunkBytesWritten = Write(pipe, buffer, bufferSize);
-                bytesWritten += chunkBytesWritten;
-                Console.WriteLine("JSON: {1} % done, wrote {0} mbytes", chunkBytesWritten / 1024 / 1024, (float)itemsSent / (float)itemCount);
+                int chunkBytesWritten = 0;
+                if (ipcType == TestIpc.NamedPipe)
+                {
+                    chunkBytesWritten = (int) WriteToPipe(pipe, buffer, bufferSize);
+                    bytesWritten += (uint) chunkBytesWritten;
+                }
+                else if (ipcType == TestIpc.TcpSocket)
+                {
+                    Console.WriteLine("Chunk size: {0})", bufferSize);
+                    WriteToSocket(socket, BitConverter.GetBytes(bufferSize), 4);
+                    chunkBytesWritten = WriteToSocket(socket, buffer, (int)bufferSize);
+                    bytesWritten += (uint) chunkBytesWritten;
+                }
+                Console.WriteLine("JSON: {0} %", ((float)itemsSent / (float)itemCount) * 100);
             }
 
             var duration = DateTime.Now.Subtract(start).TotalSeconds;
 
             Console.WriteLine("Total {0} mbytes, duration {1} secs", bytesWritten / 1024 / 1024, duration);
-            Win32.CloseHandle(pipe);
+            if (ipcType == TestIpc.NamedPipe)
+            {
+                Win32.CloseHandle(pipe);
+            }
+            else if (ipcType == TestIpc.TcpSocket)
+            {
+                socket.Dispose();
+            }
         }
 
-        static uint Write(SafeFileHandle pipe, byte[] bytes, uint byteToWrite)
+        static int WriteToSocket(Socket socket, byte[] buffer, int bytesToWrite)
+        {
+            return socket.Send(buffer, bytesToWrite, SocketFlags.None);
+        }
+
+        static uint WriteToPipe(SafeFileHandle pipe, byte[] buffer, uint bytesToWrite)
         {
             uint bytesWritten = 0;
             
-            if (!Win32.WriteFile(pipe, bytes, byteToWrite, out bytesWritten, IntPtr.Zero))
+            if (!Win32.WriteFile(pipe, buffer, bytesToWrite, out bytesWritten, IntPtr.Zero))
             {
                 var code = Marshal.GetLastWin32Error();
                 var errMsg = new Win32Exception(code).Message;
                 Console.WriteLine("WriteFile to pipe failed. GLE={0}/{0}", code, errMsg);
             }
             return bytesWritten;
+        }
+
+        static Socket GetSocket(int portNumber)
+        {
+            IPEndPoint endpoint = new IPEndPoint(IPAddress.Loopback, portNumber);
+            Socket socket = new Socket(AddressFamily.InterNetwork, 
+                SocketType.Stream, ProtocolType.Tcp );
+            socket.Connect(endpoint);
+            return socket;
         }
 
         static SafeFileHandle GetPipeClient(string name)

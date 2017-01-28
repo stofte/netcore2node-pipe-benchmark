@@ -1,13 +1,10 @@
 const EventEmitter = require('events').EventEmitter;
 const net = require('net');
-const os = require('os');
 
-const win32 = os.platform() === 'win32';
-
-class PipeServerEmitter extends EventEmitter {
+class Win32PipeServerEmitter extends EventEmitter {
     constructor(pipeName) {
         super();
-        this.pipeAddress = win32 ? `\\\\.\\pipe\\${pipeName}` : `/tmp/${pipeName}.pipe`;
+        this.pipeAddress = `\\\\.\\pipe\\${pipeName}`;
         this.createStream = (stream) => {
             return stream.on('data', this.handleWrite);
         }
@@ -20,5 +17,5 @@ class PipeServerEmitter extends EventEmitter {
 }
 
 module.exports = {
-    listen: (pipeName) => new PipeServerEmitter(pipeName)
+    listen: (pipeName) => new Win32PipeServerEmitter(pipeName)
 };
