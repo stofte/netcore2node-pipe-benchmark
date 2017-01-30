@@ -7,19 +7,19 @@ This repo contains code that benchmarks (data) throughput from
 Running
 -------
 
-Start the server (optionally use [--max-old-space-size](https://github.com/nodejs/node/issues/7937) to increase the heap size).
-Pass `tcp 1234` to test using a TCP socket on port 1234, otherwise pass `pipes` to 
+Start the server, use [--max-old-space-size](https://github.com/nodejs/node/issues/7937) to increase heap size.
 
-    node --max-old-space-size=4096 server/index.js [arg]
+`node --max-old-space-size=4096 server/index.js` *`method`*
 
-`[arg]` being one of 
+The *`method`* argument determines which underlying approach to use.
 
- - `tcp 1234` for TCP on port 1234
+ - `tcp n` for TCP on port n 
  - `pipe` for Named Pipes (Win32 only)
 
-Restore and run the client, passing the number of dummy DTOs to generate as well as the same args the server was started with.
+Restore and run the client, passing the number of dummy DTOs to generate
+as well as the method the server was started with.
 
-    dotnet restore
-    dotnet run -p client 1000000 [arg]
+`dotnet restore`
+`dotnet run -p client 1000000` *`method`*
 
 The programs outputs some basic stats on performance.
