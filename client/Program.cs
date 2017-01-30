@@ -103,12 +103,11 @@
                 }
                 else if (ipcType == TestIpc.TcpSocket)
                 {
-                    Console.WriteLine("Chunk size: {0})", bufferSize);
                     WriteToSocket(socket, BitConverter.GetBytes(bufferSize), 4);
                     chunkBytesWritten = WriteToSocket(socket, buffer, (int)bufferSize);
                     bytesWritten += (uint) chunkBytesWritten;
                 }
-                Console.WriteLine("JSON: {0} %", ((float)itemsSent / (float)itemCount) * 100);
+                Console.WriteLine("JSON: {0} %, {1} bytes", ((float)itemsSent / (float)itemCount) * 100, bufferSize);
             }
 
             var duration = DateTime.Now.Subtract(start).TotalSeconds;

@@ -10,99 +10,49 @@ class TcpSocketEmitter extends EventEmitter {
             return stream.on('data', this.handleWrite);
         };
         this.splitBuffer = (buffer, ...splits) => {
-            let offset = 0;
+            // console.log(buffer.constructor.name);
+            let offset = buffer.offset;
+            let localOff = 0;
             const list = [];
             splits.forEach(count => {
                 const off = offset;
-                offset += count + 1;
-                list.push(Buffer.from(buffer, off, count));
+                offset += count;
+                localOff += count;
+                // if (splits.length > 1) {
+                //     console.log('splitBuffer.forEach', off, '=>', count);
+                //     console.log('splitBuffer:', count, 'vs', Buffer.from(buffer.buffer, off, count).byteLength);
+                // }
+                list.push(Buffer.from(buffer.buffer, off, count));
             });
-            if (offset < buffer.length) {
-                list.push(Buffer.from(buffer, offset));
+            if (localOff < buffer.length) {
+                list.push(Buffer.from(buffer.buffer, offset));
+            } else {
+                // push an empty list for the while loop
+                list.push(new Buffer([]));
             }
             return list;
         };
         this.handleWrite = (data) => {
-            if (this.expectedBytes === 0) {
-                this.buffers = [];
-                if (data.byteLength === 4) {
-                    this.expectedBytes = data.readUInt32LE();
-                } else {
-                    const [head, rest] = this.splitBuffer(data, 4);
-                    this.expectedBytes = head.readUInt32LE();
-                    this.buffers.push(rest);
-                }
-                console.log('expectedBytes', this.expectedBytes);    
-            } else {
-                this.expectedBytes -= data.byteLength;
-                this.buffers.push(data);
+            let buff = data;
+            while (buff.byteLength > 0) {
                 if (this.expectedBytes === 0) {
-                    console.log('emitting');
+                    const [head, rest] = this.splitBuffer(buff, 4);
+                    this.expectedBytes = head.readUInt32LE();
+                    buff = rest;
+                } else if (this.expectedBytes > 0) {
+                    const readBytes = Math.min(this.expectedBytes, buff.byteLength);
+                    const [remain, rest] = this.splitBuffer(buff, readBytes);
+                    this.expectedBytes -= readBytes;
+                    this.buffers.push(remain);
+                    if (this.expectedBytes === 0) {
+                        this.emit('message', Buffer.concat(this.buffers));
+                        this.buffers = [];
+                    }
+                    buff = rest;
+                } else {
+                    throw 'unexpected';
                 }
             }
-            if (this.expectedBytes < 0) {
-                throw 'unexpected?';
-            }
-            
-            // if (this.expectedBytes === 0) {
-            //     const [head, rest] = this.splitBuffer(data, 4);
-            //     this.expectedBytes = head.readUInt32LE();
-            //     if (this.buffers.length > 0) {
-            //         this.emit('message', Buffer.concat(this.buffers));
-            //     }
-            //     this.buffers = [];
-            //     if (rest) {
-            //         this.buffers.push(rest);
-            //     }
-            // } else if (this.expectedBytes - data.length < 0) {
-            //     const [remainder, head, rest] = this.splitBuffer(data, this.expectedBytes, 4);
-            //     this.expectedBytes -= data.length;
-            //     this.buffers.push(data);
-            //     if (this.expectedBytes === 0) {
-            //         this.emit('message', Buffer.concat(this.buffers));
-            //         this.buffers = [];
-            //     } else if (this.expectedBytes < 0) {
-            //         throw 'unhandled 2';
-            //     }
-            // } else {
-            //     console.log(this.expectedBytes, data.byteLength);
-            //     throw 'unhandled';
-            // }
-
-            // if (this.expectedBytes <= 0) {
-            //     // new buffer incoming
-                
-            //     const [head, rest] = this.splitBuffer(data, 4);
-            //     this.expectedBytes = head.readUInt32LE();
-            //     if (rest) {
-            //         this.buffers.push(rest);
-            //     }
-            // } else if (this.expectedBytes - data.length < 0) {
-            //     // splitting buffer
-            //     const [remainder, head, rest] = this.splitBuffer(data, this.expectedBytes, 4);
-            //     this.buffers.push(remainder);
-            //     const msg = Buffer.concat(this.buffers);
-            //     this.expectedBytes = head.readUInt32LE();
-            //     this.buffers = [];
-            //     console.log(rest);
-            //     console.log('split expectedBytes', this.expectedBytes);
-            //     if (rest) {
-            //         this.buffers.push(rest);
-            //     }
-            //     console.log(`split buffer`);
-            //     this.emit('message', msg);
-            // } else if (this.expectedBytes - data.length === 0) {
-            //     this.buffers.push(data);
-            //     const msg = Buffer.concat(this.buffers);
-            //     this.expectedBytes = 0;
-            //     this.buffers = [];
-            //     console.log(`ending buffer`);
-            //     this.emit('message', msg);
-            // } else {
-            //     // continuing buffer
-            //     this.buffers.push(data);
-            //     this.expectedBytes -= data.length;
-            // }
         };
         net.createServer((stream) => this.createStream(stream))
             .listen(portNumber);
